@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>アートワーク検索（iTunes / Apple Music）</title>
+  <meta name="description" content="iOS / iPadOSに最適化。iTunes Search API または Apple Music API を使ってアルバム・映画・TV・アプリ等のアートワークを高解像度で検索・保存。">
+  <style>
+    /* Minimal critical CSS to avoid FOUC */
+    :root { --bg:#0b0b0c; --fg:#f5f7fb; --muted:#aeb2be; --card:#15161a; --accent:#2d6cdf; --hair:#21232a; }
+    @media (prefers-color-scheme: light) {
+      :root { --bg:#f6f7fb; --fg:#0b0b0c; --muted:#50545f; --card:#ffffff; --accent:#2d6cdf; --hair:#e6e8ee; }
+    }
+    html,body{height:100%;}
+    body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","SF Pro JP",system-ui,sans-serif;}
+    .wrap{max-width:980px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px);}
+    header{position:sticky;top:0;background:var(--bg);padding-bottom:12px;z-index:10;}
+    h1{margin:0 0 8px;font-size:22px;letter-spacing:.01em;}
+    .bar{display:grid;gap:8px;grid-template-columns:1fr;align-items:end;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:12px 0;}
+    .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+    label{font-size:12px;color:var(--muted);}
+    input[type="search"], select, input[type="text"]{width:100%;padding:12px;border-radius:12px;border:1px solid var(--hair);background:var(--card);color:var(--fg);}
+    button{appearance:none;border:0;border-radius:12px;padding:12px 14px;background:var(--accent);color:#fff;font-weight:600;}
+    button.ghost{background:transparent;border:1px solid var(--hair);color:var(--fg);}
+    .hint{font-size:12px;color:var(--muted);}
+    .results{display:grid;gap:12px;margin-top:16px;}
+    .card{background:var(--card);border:1px solid var(--hair);border-radius:16px;overflow:hidden;display:grid;grid-template-columns:112px 1fr;gap:12px;padding:12px;}
+    .cover{width:100%;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:#000;}
+    .meta{display:flex;flex-direction:column;gap:6px;}
+    .title{font-size:16px;font-weight:700;}
+    .sub{color:var(--muted);font-size:13px;}
+    .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+    .actions a,.actions button{font-size:13px;padding:8px 10px;border-radius:10px;}
+    .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+    .badge{font-size:11px;color:var(--muted);padding:4px 8px;border:1px solid var(--hair);border-radius:999px;}
+    footer{margin-top:28px;color:var(--muted);font-size:12px;text-align:center;}
+    .row.smol{grid-template-columns:1fr 1fr 1fr 1fr;}
+    .inline{display:flex;gap:8px;align-items:center;}
+  </style>
+  <link rel="preload" href="style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="style.css"></noscript>
+  <script>
+    // Register Service Worker early for iOS (will be ignored on Safari < 16.4)
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>アートワーク検索（iTunes / Apple Music）</h1>
+      <div class="hint">iPhone / iPadに最適化。アルバム、映画、TV、アプリなどのカバー画像を高解像度で取得できます。</div>
+    </header>
+
+    <section class="bar">
+      <div>
+        <label for="q">検索ワード</label>
+        <input id="q" type="search" placeholder="作品名・アーティスト・アプリ名など（例：米津玄師 / Spirited Away / YouTube）" enterkeyhint="search" />
+      </div>
+      <div class="controls">
+        <div>
+          <label for="media">カテゴリー</label>
+          <select id="media">
+            <option value="music">音楽（アルバム）</option>
+            <option value="song">音楽（曲）</option>
+            <option value="movie">映画</option>
+            <option value="tvShow">TV番組</option>
+            <option value="software">App</option>
+            <option value="podcast">Podcast</option>
+            <option value="ebook">ブック</option>
+          </select>
+        </div>
+        <div>
+          <label for="country">ストアの国</label>
+          <select id="country">
+            <option value="jp" selected>日本 (JP)</option>
+            <option value="us">United States (US)</option>
+            <option value="gb">United Kingdom (GB)</option>
+            <option value="kr">韓国 (KR)</option>
+            <option value="tw">台湾 (TW)</option>
+            <option value="cn">中国 (CN)</option>
+            <option value="de">Germany (DE)</option>
+            <option value="fr">France (FR)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="size">出力サイズ（最長辺）</label>
+          <select id="size">
+            <option>100</option>
+            <option>300</option>
+            <option selected>600</option>
+            <option>1200</option>
+            <option>2000</option>
+            <option>3000</option>
+          </select>
+        </div>
+        <div>
+          <label for="limit">件数</label>
+          <select id="limit">
+            <option>10</option>
+            <option selected>25</option>
+            <option>50</option>
+          </select>
+        </div>
+        <div class="inline">
+          <div style="flex:1">
+            <label for="token">Apple Music 開発者トークン（任意）</label>
+            <input id="token" type="text" inputmode="latin" placeholder="入力するとApple Music APIを使用（より正式な高解像度URL）">
+          </div>
+        </div>
+      </div>
+      <div class="row smol">
+        <button id="searchBtn">検索</button>
+        <button id="clearBtn" class="ghost">クリア</button>
+        <button id="installBtn" class="ghost" hidden>ホーム画面に追加</button>
+        <div class="hint">※ Apple Music APIを使うと最大解像度は作品ごとの上限に追従します。</div>
+      </div>
+    </section>
+
+    <section class="results" id="results" aria-live="polite"></section>
+
+    <footer>
+      <p>データ提供：iTunes Search API / Apple Music API. このツールは非公式です。</p>
+      <p><a href="https://developer.apple.com/library/archive/documentation/AudioVideo/Conceptual/iTuneSearchAPI/index.html" target="_blank" rel="noopener">iTunes Search API ドキュメント</a> / <a href="https://developer.apple.com/documentation/applemusicapi/artwork" target="_blank" rel="noopener">Apple Music API: Artwork</a></p>
+    </footer>
+  </div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
